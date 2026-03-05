@@ -16,3 +16,5 @@ mega_lake <- st_union(lake_mead_shape) #dissolving polygon borders into one mega
 mini_lakes <- st_cast(mega_lake, "POLYGON") #splits up multi-polygon into individual polygons
 lake_mead <- mini_lakes[2, ] #keep specific lake mead polygon (row 2, all columns)
 tm_shape(lake_mead) + tm_polygons() 
+
+#yadda 
