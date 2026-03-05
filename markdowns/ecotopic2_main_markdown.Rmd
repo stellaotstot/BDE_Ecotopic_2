@@ -1,5 +1,103 @@
 ---
-title: "ecotopic2_main_markdown"
+author: "Stellaria Otstot & Michael  Birch-Tanzer"
+date: "2026-03-03"
 output: html_document
 ---
 
+# Introduction
+
+### Research Question
+
+How has lake mead’s water level decrease affected water fowl observations?
+
+> Hypothesis 1: A decrease in the water level of lake mead will be quantitatively associated with a decrease in ebird observations of waterfowl compared to total lake mead observations because waterfowl rely on this critical watershed for habitat, food, and breeding. 
+
+> Hypothesis 2: In a reservoir unaffected by water depletion the ratio of waterfowl observations to total observations will remain relatively constant because they don’t face this unique environmental pressure.
+
+> Hypothesis 3: In study sites similar to the conditions found in lake mead (ie, stressed conditions), we will see a decline in the ratio of waterfowl observations to total observations.
+
+# Set up
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+### Load Packages
+```{r}
+#load in necessary packages
+
+getwd()
+```
+
+### Load in Data
+```{r}
+# Read in bird data from Nevada and Arizona 
+
+# Read in lake mead water level data
+water_elevation <- read.csv("lake_mead_water_elevation.csv")
+head(water_elevation)
+  #filter or combine average for fall/spring
+
+# Read in shape file for study location (around lake mead) (Q: can we download individual data points rather than shape file)
+lake_mead_shape <- st_read("lake_tracts/lake_tracts.shp")
+sf::sf_use_s2(FALSE) #solving spherical geom problem
+mega_lake <- st_union(lake_mead_shape) #dissolving polygon borders into one mega polygon
+mini_lakes <- st_cast(mega_lake, "POLYGON") #splits up multi-polygon into individual polygons
+lake_mead <- mini_lakes[2, ] #keep specific lake mead polygon (row 2, all columns)
+tm_shape(lake_mead) + tm_polygons() 
+```
+
+# Data Wrangling
+
+### Data set Wrangling
+```{r}
+# Clip bird data to lake mead shape file boundary (just include bird data for study location)
+
+# Pre visualization of lake mead shape file boundary
+
+# Drop spatial geometry
+## st_drop_geometry()
+```
+
+### Variable Wrangling
+```{r}
+#make new variable that assigns species to binary categories (waterfowl_yes, waterfowl_no)
+
+#make a proportion of waterfowl to all birds (waterfowl_prop)
+```
+
+# Body
+
+### Preliminary Visualizations
+```{r}
+# scatterplot: waterfowl_yes and water_fowl vs time (similar to below)
+
+# scatterplot: waterfowl_prop vs time
+
+# scatterplot: water_level vs time
+
+# scatterplot: waterfowl_prop vs water_level
+```
+
+
+### Model Building
+```{r}
+# model <- lm(y ~ x)
+```
+
+### Next steps?
+```{r}
+# read in more study locations (more in az/nv)
+## other reseviors (one similar with regard to water stress and one unstressed)
+## evaluate water level during spring and in fall
+```
+
+
+
+```{r}
+tmap_mode("view")
+LakeMead <- tm_shape(lake_mead_shape) +
+  tm_polygons("TRACT_ID") 
+
+LakeMead
+
+```
