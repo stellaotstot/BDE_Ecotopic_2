@@ -131,11 +131,7 @@ NV_bird_prop <- NV_bird_data %>%
   ) %>%
   ungroup()
 
-test <- st_join(water_elevation_season, NV_bird_prop, join = st_intersects) %>%
-  group_by(year, season) %>%
-  summarise(pool.elevation)
-
-test <- NV_bird_prop %>%
+prop_and_water <- NV_bird_prop %>%
   left_join(water_elevation_season, by = c("year", "season"))
 
 ```
@@ -155,7 +151,9 @@ NV_bird_prop %>%
 
 # scatterplot: water_level vs time
 
+
 # scatterplot: waterfowl_prop vs water_level
+
 ```
 
 
