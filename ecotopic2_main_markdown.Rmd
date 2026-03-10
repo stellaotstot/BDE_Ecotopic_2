@@ -29,7 +29,7 @@ library(lubridate)
 library(dplyr)
 library(ggplot2)
 
-getwd()
+#getwd()
 ```
 
 ### Load in Data
@@ -40,21 +40,8 @@ NV_bird_data <- read.csv("data/NV_final_birds.csv")
 # Read in lake mead water level data
 water_elevation <- read.csv("data/lake_mead_water_elevation.csv")
 #head(water_elevation)
-  #filter or combine average for fall/spring
-water_elevation$datetime <- as.Date(water_elevation$datetime)
-water_elevation$year <- year(water_elevation$datetime)
-water_elevation$month<- month(water_elevation$datetime)
 
-water_elevation_season<- water_elevation %>%
-  mutate(season = case_when(
-    month %in% c(2,3,4,5) ~ "Spring",
-    month %in% c(8,9,10,11) ~ "Fall",
-    ))
-
-
-
-
-# Read in shape file for study location (around lake mead) (Q: can we download individual data points rather than shape file)
+# Read in shape file for study location (around lake mead)
 lake_mead_shape <- st_read("data/lake_tracts/lake_tracts.shp")
 sf::sf_use_s2(FALSE) #solving spherical geom problem
 mega_lake <- st_union(lake_mead_shape) #dissolving polygon borders into one mega polygon
@@ -66,73 +53,83 @@ tm_shape(lake_mead) + tm_polygons()
 # Data Wrangling
 
 ### Data set Wrangling
-```{r}
-# Clip bird data to lake mead shape file boundary (just include bird data for study location)
-# Pre visualization of lake mead shape file boundary
-# Drop spatial geometry
 
-### all done in outside rmd (read in as "NV_final_birds.csv")
+#### Birds
+```{r}
+# bird data
+    # Clip bird data to lake mead shape file boundary (just include bird data for study location)
+    # Pre visualization of lake mead shape file boundary
+    # Drop spatial geometry
+
+    ### all done in outside rmd (read in as "NV_final_birds.csv")
 ```
 
 
-### Variable Wrangling
+#### Water Level
 ```{r}
-head(NV_bird_data)
+# water elevation data
+water_elevation$datetime <- as.Date(water_elevation$datetime)
+water_elevation$year <- year(water_elevation$datetime)
+water_elevation$month<- month(water_elevation$datetime)
 
-#make new variable that assigns species to binary categories (waterfowl_yes, waterfowl_no)
-NV_bird_data <- NV_bird_data %>%
-  mutate(waterfowl = ifelse(common_name %in% c("Western Grebe", "American Coot", "Ring-billed Gull", "American White Pelican"),
-      "yes",
-      "no"))
+water_elevation_season<- water_elevation %>%
+  # filter or combine average for fall/spring
+  mutate(season = case_when(
+    month %in% c(2:5) ~ "Spring",
+    month %in% c(8:11) ~ "Fall",
+    TRUE ~ NA_character_
+    ))%>%
+  filter(!is.na(season))  # only keep spring/fall months
 
-#group by year and month
-NV_bird_basics <- NV_bird_data %>%
-  # Fix observation_count
-  mutate(
-    observation_count = ifelse(observation_count == "X", 1, as.numeric(observation_count)),
-    observation_date = as.Date(observation_date),
-    year = as.numeric(format(observation_date, "%Y")),
-    month = as.numeric(format(observation_date, "%m")),
-    season = case_when(
-      month %in% 2:5  ~ "Spring",
-      month %in% 8:11 ~ "Fall",
-      TRUE             ~ NA_character_  # ignore other months
-    )
-  ) %>%
-  filter(!is.na(season)) %>%
-  group_by(common_name, year, season, waterfowl) %>%
-  summarise(total_observations = sum(observation_count, na.rm = TRUE)) %>%
-  ungroup()
-
-
-#make a proportion of waterfowl to all birds (waterfowl_prop)
-NV_bird_prop <- NV_bird_data %>%
-  # Fix observation_count and extract year/season
-  mutate(
-    observation_count = ifelse(observation_count == "X", 1, as.numeric(observation_count)),
-    observation_date = as.Date(observation_date),
-    year = as.numeric(format(observation_date, "%Y")),
-    month = as.numeric(format(observation_date, "%m")),
-    season = case_when(
-      month %in% 2:5  ~ "Spring",
-      month %in% 8:11 ~ "Fall",
-      TRUE             ~ NA_character_
-    )
-  ) %>%
-  filter(!is.na(season)) %>%
-  # Group by year and season only
+# Compute seasonal averages per year
+water_elevation_mean <- water_elevation_season %>%
   group_by(year, season) %>%
-  # Summarize total waterfowl and non-waterfowl
   summarise(
-    waterfowl_total = sum(observation_count[waterfowl == "yes"], na.rm = TRUE),
-    non_waterfowl_total = sum(observation_count[waterfowl == "no"], na.rm = TRUE),
-    total_birds = waterfowl_total + non_waterfowl_total,
-    waterfowl_prop = waterfowl_total / total_birds
-  ) %>%
-  ungroup()
+    mean_water_level = mean(pool.elevation, na.rm = TRUE),
+    .groups = "drop"
+  )
+```
 
-prop_and_water <- NV_bird_prop %>%
-  left_join(water_elevation_season, by = c("year", "season"))
+
+#### Join Birds and Water
+```{r}
+final_data <- NV_bird_data %>%
+  mutate(
+    #fix obs with X's
+    observation_count = ifelse(observation_count == "X", 1, as.numeric(observation_count)), 
+    #lubridate breaks apart date column
+    observation_date = as.Date(observation_date),
+    year = as.numeric(format(observation_date, "%Y")),
+    month = as.numeric(format(observation_date, "%m")), 
+    #make categories for spring and fall
+    season = case_when(
+      month %in% 2:5  ~ "Spring",
+      month %in% 8:11 ~ "Fall", 
+      #gets rid of observations that do not fall into these spring/fall categories
+      TRUE ~ NA_character_ 
+    )
+  ) %>%
+  #filter out na's
+  filter(!is.na(season)) %>%
+  #group by and summarize vars of interest
+  group_by(common_name, year, season, waterfowl) %>%
+  summarise(
+    #make obs count
+    total_observations = sum(observation_count, na.rm = TRUE),
+    #drop groups
+    .groups = "drop" 
+  ) %>%
+  group_by(year, season) %>%
+  summarise(
+    #make vars for prop calculations
+    waterfowl_total = sum(total_observations[waterfowl == "yes"], na.rm = TRUE),
+    non_waterfowl_total = sum(total_observations[waterfowl == "no"], na.rm = TRUE),
+    total_birds = waterfowl_total + non_waterfowl_total,
+    waterfowl_prop = waterfowl_total / total_birds,
+    .groups = "drop"
+  ) %>%
+  #join water elevation data by year and season
+  left_join(water_elevation_mean, by = c("year", "season"))
 
 ```
 
@@ -140,19 +137,35 @@ prop_and_water <- NV_bird_prop %>%
 
 ### Preliminary Visualizations
 ```{r}
-# scatterplot: waterfowl_yes and waterfowl_no vs time (similar to below)
+# scatterplot: waterfowl and non_waterfowl vs time (similar to below)
+final_data %>%
+  ggplot(aes(x = year)) +
+  geom_point(aes(y = waterfowl_total, color = "Waterfowl")) +
+  geom_point(aes(y = non_waterfowl_total, color = "Non-waterfowl")) +
+  geom_smooth(aes(y = waterfowl_total, color = "Waterfowl"), method = "lm") +
+  geom_smooth(aes(y = non_waterfowl_total, color = "Non-waterfowl"), method = "lm") +
+  theme_minimal()
 
 # scatterplot: waterfowl_prop vs time
-NV_bird_prop %>%
+final_data %>%
   ggplot(aes(y = waterfowl_prop, x = year, color = season)) +
   geom_point() +
   geom_smooth(method = "lm") +
   theme_minimal()
 
 # scatterplot: water_level vs time
-
+final_data %>%
+  ggplot(aes(y = mean_water_level, x = year, color = season))+
+  geom_point() +
+  geom_smooth(se = FALSE, alpha = 0.5, #color = "black")
+  )
 
 # scatterplot: waterfowl_prop vs water_level
+final_data %>%
+  ggplot(aes(y = waterfowl_prop, x = mean_water_level, color = season)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  theme_minimal()
 
 ```
 
@@ -162,6 +175,10 @@ NV_bird_prop %>%
 #waterfowl prop vs time
 model_1 <- lm(waterfowl_prop ~ year + season, data = NV_bird_prop)
 summary(model_1)
+
+#waterfowl prop vs pool elevation
+model_2 <- lm(waterfowl_prop ~ pool.elevation + season, data = prop_and_water)
+summary(model_2)
 ```
 
 ### Next steps?
@@ -172,12 +189,13 @@ summary(model_1)
 ```
 
 
+# Apendix
 
+### lake mead shape
 ```{r}
 tmap_mode("view")
 LakeMead <- tm_shape(lake_mead_shape) +
   tm_polygons("TRACT_ID") 
 
 LakeMead
-
 ```
