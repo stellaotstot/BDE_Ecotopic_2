@@ -27,6 +27,7 @@ library(sf)
 library(tmap)
 library(lubridate)
 library(dplyr)
+library(ggplot2)
 
 getwd()
 ```
@@ -38,7 +39,7 @@ NV_bird_data <- read.csv("data/NV_final_birds.csv")
 
 # Read in lake mead water level data
 water_elevation <- read.csv("data/lake_mead_water_elevation.csv")
-head(water_elevation)
+#head(water_elevation)
   #filter or combine average for fall/spring
 water_elevation$datetime <- as.Date(water_elevation$datetime)
 water_elevation$year <- year(water_elevation$datetime)
@@ -129,15 +130,28 @@ NV_bird_prop <- NV_bird_data %>%
     waterfowl_prop = waterfowl_total / total_birds
   ) %>%
   ungroup()
+
+test <- st_join(water_elevation_season, NV_bird_prop, join = st_intersects) %>%
+  group_by(year, season) %>%
+  summarise(pool.elevation)
+
+test <- NV_bird_prop %>%
+  left_join(water_elevation_season, by = c("year", "season"))
+
 ```
 
 # Body
 
 ### Preliminary Visualizations
 ```{r}
-# scatterplot: waterfowl_yes and water_fowl vs time (similar to below)
+# scatterplot: waterfowl_yes and waterfowl_no vs time (similar to below)
 
 # scatterplot: waterfowl_prop vs time
+NV_bird_prop %>%
+  ggplot(aes(y = waterfowl_prop, x = year, color = season)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  theme_minimal()
 
 # scatterplot: water_level vs time
 
@@ -147,7 +161,9 @@ NV_bird_prop <- NV_bird_data %>%
 
 ### Model Building
 ```{r}
-# model <- lm(y ~ x)
+#waterfowl prop vs time
+model_1 <- lm(waterfowl_prop ~ year + season, data = NV_bird_prop)
+summary(model_1)
 ```
 
 ### Next steps?
