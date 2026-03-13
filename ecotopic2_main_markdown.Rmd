@@ -174,6 +174,7 @@ final_data %>%
 # scatterplot: waterfowl_prop vs water_level
 final_data %>%
   ggplot(aes(y = waterfowl_prop, x = mean_water_level, color = season)) +
+  scale_x_reverse()+
   geom_point() +
   geom_smooth(method = "lm", se = FALSE) +
   theme_minimal()+
